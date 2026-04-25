@@ -19,6 +19,20 @@ def bilateral_denoise(image, d=9, sigma_color=75, sigma_space=75):
     return cv2.bilateralFilter(image, d, sigma_color, sigma_space)
 
 
+def median_denoise(image, kernel_size=3):
+    """
+    Apply median filter to reduce salt-and-pepper (impulse) noise.
+
+    Args:
+        image: Input image (BGR)
+        kernel_size: Median filter kernel size (odd)
+
+    Returns:
+        Denoised image
+    """
+    return cv2.medianBlur(image, kernel_size)
+
+
 def apply_clahe(image, clip_limit=2.0, tile_grid_size=(8, 8)):
     """
     Apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
@@ -124,8 +138,9 @@ def enhance_image(image, use_deconvolution=False):
     Returns:
         Enhanced image
     """
-    # Step 1: Denoise
+    # Step 1: Denoise (bilateral + median for impulse noise)
     denoised = bilateral_denoise(image)
+    denoised = median_denoise(denoised)
 
     # Step 2: Enhance contrast
     contrast_enhanced = apply_clahe(denoised)

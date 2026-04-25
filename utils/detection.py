@@ -1,5 +1,10 @@
+import logging
+
 import cv2
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
 
 
 def detect_card_edges(image):
@@ -131,6 +136,43 @@ def apply_perspective_transform(image, contour):
     return warped
 
 
+def is_axis_aligned_rect(contour, angle_tolerance=10.0):
+    """
+    Check if detected contour is close to an axis-aligned rectangle.
+
+    Args:
+        contour: Card boundary contour (4 points)
+        angle_tolerance: Maximum allowed angle (degrees) from axis alignment
+
+    Returns:
+        bool: True if contour is near axis-aligned, False otherwise
+    """
+    pts = contour.reshape(4, 2).astype(np.float32)
+    rect = cv2.minAreaRect(pts)
+    angle = rect[2]
+
+    # Normalize OpenCV angle to [-45, 45]
+    if angle < -45:
+        angle += 90
+
+    return abs(angle) <= angle_tolerance
+
+
+def crop_bounding_rect(image, contour):
+    """
+    Crop axis-aligned bounding rectangle for detected contour.
+
+    Args:
+        image: Input image (BGR)
+        contour: Card boundary contour
+
+    Returns:
+        Cropped image
+    """
+    x, y, w, h = cv2.boundingRect(contour)
+    return image[y:y + h, x:x + w]
+
+
 def detect_and_extract_card(image):
     """
     Complete pipeline to detect and extract card region.
@@ -141,6 +183,8 @@ def detect_and_extract_card(image):
     Returns:
         tuple: (extracted_card, success_flag, message)
     """
+    fallback_message = "Card detection failed, using original image"
+
     try:
         # Detect edges
         edges = detect_card_edges(image)
@@ -149,12 +193,17 @@ def detect_and_extract_card(image):
         contour = find_card_contour(edges, image.shape)
 
         if contour is None:
-            return image, False, "Card detection failed, using original image"
+            logger.warning(fallback_message)
+            return image, False, fallback_message
 
-        # Apply perspective transform
-        card = apply_perspective_transform(image, contour)
+        # Skip perspective correction when card is already aligned
+        if is_axis_aligned_rect(contour):
+            card = crop_bounding_rect(image, contour)
+        else:
+            card = apply_perspective_transform(image, contour)
 
         return card, True, "Card detected and extracted successfully"
 
     except Exception as e:
-        return image, False, f"Card detection failed: {str(e)}, using original image"
+        logger.warning(f"{fallback_message}: {str(e)}")
+        return image, False, fallback_message

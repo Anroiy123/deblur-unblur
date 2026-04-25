@@ -83,6 +83,36 @@ else:
     st.title("🪪 ID Card Deblur Application")
     st.markdown("Upload a blurred ID card image to enhance and extract text")
 
+    def render_enhanced_text_diff(original_text, enhanced_text):
+        """
+        Render enhanced OCR text with inserted/corrected tokens highlighted.
+        """
+        from difflib import ndiff
+        import html
+
+        original_tokens = original_text.split()
+        enhanced_tokens = enhanced_text.split()
+        diff_tokens = ndiff(original_tokens, enhanced_tokens)
+
+        rendered_tokens = []
+        has_highlight = False
+
+        for token in diff_tokens:
+            if token.startswith("+ "):
+                has_highlight = True
+                content = html.escape(token[2:])
+                rendered_tokens.append(
+                    f"<mark style='background-color:#d4f8d4;padding:0.08em 0.2em;border-radius:0.2em;'>{content}</mark>"
+                )
+            elif token.startswith("  "):
+                rendered_tokens.append(html.escape(token[2:]))
+
+        if has_highlight:
+            st.markdown("**Enhanced Text Differences (new/corrected highlighted)**")
+            st.markdown("<div style='line-height:1.8;'>" + " ".join(rendered_tokens) + "</div>", unsafe_allow_html=True)
+            st.caption("Green highlights indicate words that are new or corrected in the enhanced OCR output.")
+
+
     # File uploader
     uploaded_file = st.file_uploader(
         "Choose an ID card image",
@@ -93,6 +123,19 @@ else:
     if uploaded_file is None:
         st.info("Upload a blurred ID card image to begin")
     else:
+        # Explicit format validation (before PIL open)
+        allowed_extensions = {"jpg", "jpeg", "png"}
+        allowed_mime_types = {"image/jpeg", "image/png"}
+        file_name = (uploaded_file.name or "").lower()
+        file_extension = file_name.rsplit(".", 1)[-1] if "." in file_name else ""
+        file_type = (uploaded_file.type or "").lower()
+
+        invalid_extension = file_extension not in allowed_extensions
+        invalid_mime = bool(file_type) and file_type not in allowed_mime_types
+        if invalid_extension or invalid_mime:
+            st.error("Invalid image format. Please upload JPG, PNG, or JPEG files.")
+            st.stop()
+
         # Check file size
         file_size_mb = uploaded_file.size / (1024 * 1024)
         if file_size_mb > 10:
@@ -142,10 +185,12 @@ else:
                         card_rgb = cv2.cvtColor(card_image, cv2.COLOR_BGR2RGB)
                         st.image(card_rgb, caption="Detected Card Region", use_container_width=True)
                     else:
-                        st.info(detection_message)
+                        st.warning(detection_message)
+                        st.info("Processing full image (card not detected)")
                         card_image = image_bgr
                 except Exception as e:
-                    st.warning(f"Card detection failed: {str(e)}. Using original image.")
+                    st.warning("Card detection failed, using original image")
+                    st.info("Processing full image (card not detected)")
                     card_image = image_bgr
             else:
                 card_image = image_bgr
@@ -322,6 +367,8 @@ else:
                     # Compare OCR results
                     if original_text and enhanced_text and not original_text.startswith("Error") and not enhanced_text.startswith("Error"):
                         comparison = compare_ocr_results(original_text, enhanced_text)
+
+                        render_enhanced_text_diff(original_text, enhanced_text)
 
                         st.subheader("OCR Comparison Statistics")
                         col1, col2, col3 = st.columns(3)

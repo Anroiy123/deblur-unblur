@@ -33,6 +33,24 @@ def apply_text_clahe(image, clip_limit=3.0, tile_grid_size=(8, 8)):
     return clahe.apply(image)
 
 
+def sharpen_text(image):
+    """
+    Apply text-focused sharpening before thresholding.
+
+    Args:
+        image: Input grayscale image
+
+    Returns:
+        Sharpened grayscale image
+    """
+    kernel = np.array([
+        [0, -1, 0],
+        [-1, 5, -1],
+        [0, -1, 0]
+    ], dtype=np.float32)
+    return cv2.filter2D(image, -1, kernel)
+
+
 def adaptive_threshold(image, method='gaussian', block_size=11, C=2):
     """
     Apply adaptive thresholding to binarize text.
@@ -107,8 +125,11 @@ def preprocess_for_ocr(image):
     # Enhance contrast
     enhanced = apply_text_clahe(gray)
 
+    # Sharpen text before thresholding
+    sharpened = sharpen_text(enhanced)
+
     # Apply adaptive thresholding
-    binary = adaptive_threshold(enhanced)
+    binary = adaptive_threshold(sharpened)
 
     # Clean with morphological operations
     cleaned = morphological_operations(binary)
