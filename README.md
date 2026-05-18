@@ -1,149 +1,119 @@
-# ID Card Deblur Application
+# ID Card Deblur + OCR Application
 
-A Computer Vision application for enhancing blurred ID card images using classical image processing techniques. This project demonstrates deblurring, text extraction improvement, and quality metrics calculation.
+Ứng dụng Streamlit để khử mờ ảnh căn cước/giấy tờ, cải thiện vùng ảnh quan trọng và trích xuất văn bản OCR. Repo hiện giữ pipeline OpenCV/EasyOCR làm baseline chạy được ngay, đồng thời đã refactor để đi theo hướng khuyến nghị: thêm lớp khôi phục tài liệu kiểu DocRes và ưu tiên PaddleOCR khi môi trường đã cài backend AI.
 
-## Features
+## Kiến trúc Pipeline
 
-- **Image Enhancement**: Bilateral filtering, CLAHE contrast enhancement, unsharp masking, and optional Wiener deconvolution
-- **Card Detection**: Automatic ID card region detection with perspective correction
-- **Text Enhancement**: OCR-optimized preprocessing with adaptive thresholding and morphological operations
-- **Face Enhancement**: Targeted face region detection and enhancement within ID cards
-- **OCR Extraction**: Text extraction using EasyOCR with before/after comparison
-- **Quality Metrics**: Sharpness calculation (Laplacian variance), optional PSNR/SSIM with reference images
-- **Synthetic Blur Generator**: Tool for creating test cases with Gaussian, motion, and defocus blur
-
-## Requirements
-
-- Python 3.8+
-- Dependencies listed in `requirements.txt`
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd deblur-unblur
+```text
+uploaded image
+  -> card detection / perspective correction
+  -> restoration backend
+       - OpenCV baseline
+       - DocRes command adapter (optional)
+  -> optional face-region enhancement
+  -> OCR preprocessing policy
+       - auto by engine
+       - preserve color/original
+       - OpenCV threshold
+  -> OCR backend
+       - PaddleOCR (recommended, optional)
+       - EasyOCR (baseline/fallback)
+  -> OCR comparison + accuracy/CER/WER metrics
 ```
 
-2. Create a virtual environment (recommended):
-```bash
+## Tính Năng
+
+- **Card detection**: phát hiện vùng căn cước và hiệu chỉnh phối cảnh.
+- **Document restoration**: OpenCV baseline chạy ngay; DocRes adapter có thể cấu hình ngoài qua `DOCRES_COMMAND`.
+- **Enhancement modes**: chế độ tự nhiên để dễ xem và chế độ OCR để tăng nét chữ.
+- **OCR backend switch**: PaddleOCR là hướng chính; EasyOCR được giữ làm baseline/fallback.
+- **Backend-aware OCR preprocessing**: PaddleOCR mặc định giữ ảnh màu/gốc để tránh threshold phá nét chữ; EasyOCR baseline vẫn có thể dùng threshold OpenCV.
+- **OCR metrics**: so sánh ký tự, độ chính xác đơn giản, CER và WER khi có ground truth.
+- **Synthetic blur generator**: tạo ảnh Gaussian/motion/defocus blur để kiểm thử.
+
+## Cài Đặt
+
+Yêu cầu Python 3.8+.
+
+```powershell
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## Usage
+Nếu muốn dùng PaddleOCR:
 
-### Running the Application
+```powershell
+pip install -r requirements-ai.txt
+```
 
-Start the Streamlit application:
-```bash
+`requirements-ai.txt` được tách riêng vì PaddleOCR/PaddlePaddle nặng hơn và có thể cần chọn bản phù hợp CPU/GPU của máy.
+
+## Chạy Ứng Dụng
+
+```powershell
 streamlit run app.py
 ```
 
-The application will open in your default web browser at `http://localhost:8501`.
+Mở trình duyệt tại `http://localhost:8501`.
 
-### Main Features
+## Cấu Hình DocRes Adapter
 
-#### 1. Deblur Image (Main Page)
+DocRes không được nhúng trực tiếp vào repo này vì cần repo/weights riêng. App hỗ trợ gọi DocRes qua biến môi trường:
 
-1. Upload a blurred ID card image (JPG, PNG, or JPEG)
-2. Enable/disable card detection and perspective correction
-3. Optionally upload a reference image for PSNR/SSIM calculation
-4. Configure enhancement options:
-   - Enable Wiener deconvolution for motion/defocus blur
-   - Enable face region enhancement
-5. Click "Enhance Image" to process
-6. View results:
-   - Before/after image comparison
-   - Quality metrics (sharpness improvement)
-   - Face region comparison (if detected)
-   - OCR text extraction comparison
-7. Optionally enter ground truth text for accuracy calculation
-
-#### 2. Generate Synthetic Blur (Testing Tool)
-
-1. Select "Generate Synthetic Blur" from the sidebar
-2. Upload a sharp image
-3. Choose blur type:
-   - **Gaussian Blur**: Simulates out-of-focus blur
-   - **Motion Blur**: Simulates camera shake (adjustable angle)
-   - **Defocus Blur**: Simulates lens defocus
-4. Adjust parameters and generate blurred versions for testing
-
-## Project Structure
-
+```powershell
+$env:DOCRES_COMMAND='python C:\path\to\DocRes\inference.py --task {task} --input "{input}" --output "{output}"'
+streamlit run app.py
 ```
+
+Các placeholder:
+
+- `{input}`: ảnh tạm đầu vào do app ghi ra.
+- `{output}`: ảnh tạm mà lệnh DocRes phải tạo.
+- `{task}`: `end2end` hoặc `deblurring`.
+
+Nếu chọn DocRes nhưng chưa cấu hình hoặc lệnh lỗi, app tự fallback về OpenCV baseline để workflow không bị gãy.
+
+## Kiểm Thử
+
+```powershell
+python -m pytest
+```
+
+Các test hiện khóa những contract chính:
+
+- OCR EasyOCR cache và text extraction.
+- PaddleOCR result parser và fallback sang EasyOCR.
+- Policy tiền xử lý OCR theo engine.
+- DocRes adapter fallback.
+- Enhancement, detection, face, metrics và blur generator.
+
+## Cấu Trúc
+
+```text
 deblur-unblur/
-├── app.py                      # Main Streamlit application
-├── requirements.txt            # Python dependencies
+├── app.py
+├── requirements.txt
+├── requirements-ai.txt
 ├── utils/
-│   ├── enhancement.py          # Classical enhancement algorithms
-│   ├── text_processing.py      # Text-specific preprocessing
-│   ├── ocr.py                  # OCR extraction and comparison
-│   ├── detection.py            # Card detection and perspective correction
-│   ├── face.py                 # Face region enhancement
-│   ├── metrics.py              # Quality metrics calculation
-│   └── blur_generator.py       # Synthetic blur generation
-└── README.md                   # This file
+│   ├── enhancement.py
+│   ├── restoration.py
+│   ├── text_processing.py
+│   ├── ocr.py
+│   ├── detection.py
+│   ├── face.py
+│   ├── metrics.py
+│   └── blur_generator.py
+└── tests/
 ```
 
-## Technical Details
+## Ghi Chú Kỹ Thuật
 
-### Enhancement Pipeline
-
-1. **Denoising**: Bilateral filter for edge-preserving noise reduction
-2. **Contrast Enhancement**: CLAHE (Contrast Limited Adaptive Histogram Equalization)
-3. **Sharpening**: Unsharp masking technique
-4. **Optional Deconvolution**: Wiener deconvolution for motion/defocus blur
-
-### Text Processing Pipeline
-
-1. Grayscale conversion
-2. Text-specific CLAHE tuning
-3. Adaptive thresholding (Gaussian/mean)
-4. Morphological operations (opening/closing)
-
-### Card Detection
-
-1. Canny edge detection
-2. Contour finding and quadrilateral detection
-3. Perspective transformation (homography)
-4. Fallback to original image if detection fails
-
-### Face Enhancement
-
-1. Haar Cascade face detection
-2. Face region extraction
-3. Targeted enhancement (CLAHE, sharpening, denoising)
-4. Seamless blending back to card image
-
-## Limitations
-
-- Classical CV techniques may not handle severe blur as effectively as deep learning approaches
-- OCR accuracy depends on text quality and preprocessing effectiveness
-- Face detection may fail on low-quality or non-frontal face photos
-- Card detection requires clear card edges and sufficient contrast
-
-## Future Work
-
-- Deep learning-based deblurring (e.g., DeblurGAN, MIMO-UNet)
-- Custom OCR model training for ID card text
-- Batch processing support
-- Real-time video processing
-- Mobile application deployment
+- Không nên tối ưu theo sharpness/Laplacian đơn thuần. Chỉ số này vẫn hiển thị để tham khảo, nhưng mục tiêu chính là OCR đúng hơn.
+- Với OCR hiện đại như PaddleOCR, không threshold ảnh quá sớm nếu chưa có số liệu chứng minh tốt hơn.
+- OpenCV baseline vẫn hữu ích cho demo nhanh, CPU-only và fallback.
+- DocRes nên được đánh giá bằng tập ảnh CCCD/giấy tờ thật với ground truth để chọn giữa `end2end` và `deblurring`.
 
 ## License
 
-This project is for educational purposes (Computer Vision course final project).
-
-## Acknowledgments
-
-- OpenCV for computer vision algorithms
-- EasyOCR for text extraction
-- Streamlit for rapid UI development
-- scikit-image for quality metrics
+Project phục vụ mục đích học tập/thực nghiệm Computer Vision.

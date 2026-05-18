@@ -6,9 +6,14 @@ AGENTS.md
 openspec/
 test_images/
 DEMO_SCRIPT.md
+.pytest_cache/
+.coverage
+plans/
+tests/
 
 # Python
 venv/
+.venv312/
 __pycache__/
 *.pyc
 *.pyo
@@ -19,9 +24,20 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+create_report.py
+pytest.ini
 
 # Streamlit
 .streamlit/
+streamlit-*.log
+streamlit-refactor-snapshot.md
+
+# Local AI model/runtime installs
+external/
+
+# Browser/test artifacts
+.playwright-mcp/
+coverage.json
 
 # IDE
 .idea/

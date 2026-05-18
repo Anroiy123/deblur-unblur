@@ -151,11 +151,11 @@ def is_axis_aligned_rect(contour, angle_tolerance=10.0):
     rect = cv2.minAreaRect(pts)
     angle = rect[2]
 
-    # Normalize OpenCV angle to [-45, 45]
-    if angle < -45:
-        angle += 90
+    # OpenCV angle conventions differ across versions; 0 and +/-90 are aligned.
+    normalized_angle = abs(angle) % 90
+    axis_delta = min(normalized_angle, 90 - normalized_angle)
 
-    return abs(angle) <= angle_tolerance
+    return axis_delta <= angle_tolerance
 
 
 def crop_bounding_rect(image, contour):

@@ -1,6 +1,11 @@
 import cv2
 import numpy as np
 
+OCR_PREPROCESS_AUTO = "auto"
+OCR_PREPROCESS_PRESERVE = "preserve"
+OCR_PREPROCESS_GRAYSCALE = "grayscale"
+OCR_PREPROCESS_THRESHOLD = "threshold"
+
 
 def convert_to_grayscale(image):
     """
@@ -135,3 +140,42 @@ def preprocess_for_ocr(image):
     cleaned = morphological_operations(binary)
 
     return cleaned
+
+
+def preserve_for_ocr(image):
+    """
+    Keep the image close to detector input for modern OCR engines.
+
+    Modern OCR engines such as PaddleOCR usually perform their own detection
+    and normalization, so aggressive thresholding can remove faint strokes.
+    """
+    return image.copy()
+
+
+def prepare_image_for_ocr(image, backend="easyocr", profile=OCR_PREPROCESS_AUTO):
+    """
+    Prepare an image for OCR using a backend-aware policy.
+
+    Args:
+        image: Input image (BGR or grayscale)
+        backend: OCR backend key, e.g. 'easyocr' or 'paddleocr'
+        profile: 'auto', 'preserve', 'grayscale', or 'threshold'
+
+    Returns:
+        Image ready to send to the OCR backend.
+    """
+    profile = (profile or OCR_PREPROCESS_AUTO).strip().lower()
+    backend = (backend or "easyocr").strip().lower()
+
+    if profile == OCR_PREPROCESS_THRESHOLD:
+        return preprocess_for_ocr(image)
+    if profile == OCR_PREPROCESS_GRAYSCALE:
+        return convert_to_grayscale(image)
+    if profile == OCR_PREPROCESS_PRESERVE:
+        return preserve_for_ocr(image)
+    if profile != OCR_PREPROCESS_AUTO:
+        raise ValueError(f"Unsupported OCR preprocessing profile: {profile}")
+
+    if backend in ("paddleocr", "paddle", "paddle_ocr"):
+        return preserve_for_ocr(image)
+    return preprocess_for_ocr(image)
