@@ -10,6 +10,7 @@ DEMO_SCRIPT.md
 .coverage
 plans/
 tests/
+.kiro
 
 # Python
 venv/
