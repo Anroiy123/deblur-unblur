@@ -9,7 +9,6 @@ DEMO_SCRIPT.md
 .pytest_cache/
 .coverage
 plans/
-tests/
 .kiro
 
 # Python
@@ -25,16 +24,20 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-create_report.py
-pytest.ini
 
 # Streamlit
 .streamlit/
 streamlit-*.log
 streamlit-refactor-snapshot.md
 
-# Local AI model/runtime installs
-external/
+# External/DocRes - ignore only large weights and data, keep code
+external/**/checkpoints/
+external/**/data/
+external/**/images/
+external/**/input/
+external/**/restorted/
+external/**/__pycache__/
+external/**/*.pyc
 
 # Browser/test artifacts
 .playwright-mcp/
