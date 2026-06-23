@@ -77,18 +77,16 @@ def order_points(pts):
     Returns:
         Ordered points
     """
-    rect = np.zeros((4, 2), dtype=np.float32)
+    pts = np.asarray(pts, dtype=np.float32).reshape(4, 2)
+    center = pts.mean(axis=0)
+    angles = np.arctan2(pts[:, 1] - center[1], pts[:, 0] - center[0])
+    ordered = pts[np.argsort(angles)]
 
-    # Sum and difference to find corners
-    s = pts.sum(axis=1)
-    diff = np.diff(pts, axis=1)
-
-    rect[0] = pts[np.argmin(s)]      # Top-left (smallest sum)
-    rect[2] = pts[np.argmax(s)]      # Bottom-right (largest sum)
-    rect[1] = pts[np.argmin(diff)]   # Top-right (smallest difference)
-    rect[3] = pts[np.argmax(diff)]   # Bottom-left (largest difference)
-
-    return rect
+    sums = ordered.sum(axis=1)
+    min_sum = sums.min()
+    start_candidates = np.flatnonzero(np.isclose(sums, min_sum))
+    start = start_candidates[np.argmin(ordered[start_candidates, 0])]
+    return np.roll(ordered, -start, axis=0).astype(np.float32)
 
 
 def apply_perspective_transform(image, contour):

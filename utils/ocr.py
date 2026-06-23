@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import importlib
 import importlib.util
+import os
 import sys
 
 import numpy as np
@@ -120,23 +121,26 @@ def get_paddleocr_reader():
     if _paddle_reader is not None:
         return _paddle_reader
 
+    # Work around PaddleOCR 3.x CPU failures on Windows/oneDNN by
+    # disabling the PIR path before the module initializes.
+    os.environ.setdefault("FLAGS_enable_pir_api", "0")
     paddleocr_module = importlib.import_module("paddleocr")
     PaddleOCR = paddleocr_module.PaddleOCR
 
     # PaddleOCR has changed constructor flags across versions. Try the
     # Vietnamese-friendly legacy config first, then fall back to minimal config.
     init_attempts = (
-        {"use_angle_cls": True, "lang": "vi", "show_log": False},
-        {"use_angle_cls": True, "lang": "vi"},
-        {"lang": "vi"},
-        {},
+        {"use_angle_cls": True, "lang": "vi", "show_log": False, "enable_mkldnn": False},
+        {"use_angle_cls": True, "lang": "vi", "enable_mkldnn": False},
+        {"lang": "vi", "enable_mkldnn": False},
+        {"enable_mkldnn": False},
     )
     last_error = None
     for kwargs in init_attempts:
         try:
             _paddle_reader = PaddleOCR(**kwargs)
             return _paddle_reader
-        except TypeError as exc:
+        except (TypeError, ValueError) as exc:
             last_error = exc
 
     raise RuntimeError(f"Unable to initialize PaddleOCR: {last_error}")
@@ -187,6 +191,9 @@ def _collect_paddle_text(raw_result):
         return []
 
     if isinstance(raw_result, (list, tuple)):
+        if raw_result and all(isinstance(item, str) for item in raw_result):
+            return [item for item in raw_result if item.strip()]
+
         # Legacy PaddleOCR line format: [box, (text, confidence)].
         if len(raw_result) >= 2:
             second = raw_result[1]
@@ -343,16 +350,12 @@ def calculate_accuracy(ground_truth, extracted_text):
     gt_normalized = ''.join(ground_truth.lower().split())
     ext_normalized = ''.join(extracted_text.lower().split())
 
-    # Calculate character-level accuracy using simple matching
     if len(gt_normalized) == 0:
         return 0.0
 
-    matches = sum(1 for a, b in zip(gt_normalized, ext_normalized) if a == b)
-    max_len = max(len(gt_normalized), len(ext_normalized))
-
-    accuracy = (matches / max_len) * 100
-
-    return accuracy
+    distance = _levenshtein_distance(gt_normalized, ext_normalized)
+    accuracy = (1 - (distance / len(gt_normalized))) * 100
+    return max(0.0, min(100.0, accuracy))
 
 
 def compare_ocr_results(original_text, enhanced_text):

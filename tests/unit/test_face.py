@@ -41,6 +41,19 @@ def test_blend_face_back_replaces_target_region(face_like_image):
     assert not np.array_equal(blended[70:150, 70:150], face_like_image[70:150, 70:150])
 
 
+def test_blend_face_back_feathers_region_edges():
+    image = np.zeros((50, 50, 3), dtype=np.uint8)
+    replacement = np.full((20, 20, 3), 255, dtype=np.uint8)
+
+    blended = face.blend_face_back(image, replacement, (15, 15, 20, 20))
+
+    boundary_value = int(blended[15, 15, 0])
+    center_value = int(blended[25, 25, 0])
+    assert 0 < boundary_value < 255
+    assert center_value > boundary_value
+    assert center_value > 240
+
+
 def test_enhance_face_in_card_returns_fallback_when_no_face(clean_image, monkeypatch):
     monkeypatch.setattr(face, "detect_face", lambda _image: None)
     result, found, original_face, enhanced_face, message = face.enhance_face_in_card(clean_image)

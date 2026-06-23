@@ -1,39 +1,38 @@
 # ID Card Deblur + OCR Application
 
-Ứng dụng Streamlit để khử mờ ảnh căn cước/giấy tờ, cải thiện vùng ảnh quan trọng và trích xuất văn bản OCR. Repo hiện giữ pipeline OpenCV/EasyOCR làm baseline chạy được ngay, đồng thời đã refactor để đi theo hướng khuyến nghị: thêm lớp khôi phục tài liệu kiểu DocRes và ưu tiên PaddleOCR khi môi trường đã cài backend AI.
+Ứng dụng Streamlit một trang để khử mờ ảnh căn cước/giấy tờ và trích xuất
+văn bản OCR. Luồng mặc định ưu tiên DocRes rồi tự fallback OpenCV; OCR ưu tiên
+PaddleOCR rồi fallback EasyOCR.
 
 ## Kiến trúc Pipeline
 
 ```text
 uploaded image
-  -> card detection / perspective correction
   -> restoration backend
-       - OpenCV baseline
-       - DocRes command adapter (optional)
-  -> optional face-region enhancement
+       - DocRes deblurring (default)
+       - OpenCV fallback or manual override
   -> OCR preprocessing policy
        - auto by engine
        - preserve color/original
        - OpenCV threshold
   -> OCR backend
-       - PaddleOCR (recommended, optional)
-       - EasyOCR (baseline/fallback)
-  -> OCR comparison + accuracy/CER/WER metrics
+       - PaddleOCR (preferred)
+       - EasyOCR fallback
+  -> optional CER/WER against text ground truth
 ```
 
 ## Tính Năng
 
-- **Card detection**: phát hiện vùng căn cước và hiệu chỉnh phối cảnh.
-- **Document restoration**: OpenCV baseline chạy ngay; DocRes adapter có thể cấu hình ngoài qua `DOCRES_COMMAND`.
+- **Document restoration**: mặc định thử DocRes `deblurring`, tự fallback OpenCV nếu lỗi.
 - **Enhancement modes**: chế độ tự nhiên để dễ xem và chế độ OCR để tăng nét chữ.
-- **OCR backend switch**: PaddleOCR là hướng chính; EasyOCR được giữ làm baseline/fallback.
+- **OCR tự động**: ưu tiên PaddleOCR và fallback EasyOCR, không yêu cầu người dùng chọn engine.
 - **Backend-aware OCR preprocessing**: PaddleOCR mặc định giữ ảnh màu/gốc để tránh threshold phá nét chữ; EasyOCR baseline vẫn có thể dùng threshold OpenCV.
-- **OCR metrics**: so sánh ký tự, độ chính xác đơn giản, CER và WER khi có ground truth.
-- **Synthetic blur generator**: tạo ảnh Gaussian/motion/defocus blur để kiểm thử.
+- **Cấu hình nâng cao**: cho phép ép OpenCV, đổi preprocessing và bật Wiener deconvolution.
+- **OCR metrics**: CER và WER khi người dùng có ground truth văn bản.
 
 ## Cài Đặt
 
-Yêu cầu Python 3.8+.
+Yêu cầu Python 3.9+. Cấu hình đã được kiểm thử chính trên Python 3.12.
 
 ```powershell
 python -m venv venv
@@ -59,20 +58,48 @@ Mở trình duyệt tại `http://localhost:8501`.
 
 ## Cấu Hình DocRes Adapter
 
-DocRes không được nhúng trực tiếp vào repo này vì cần repo/weights riêng. App hỗ trợ gọi DocRes qua biến môi trường:
+DocRes được khai báo dưới dạng Git submodule. Khi clone mới, lấy mã nguồn
+submodule bằng một trong hai cách:
 
 ```powershell
-$env:DOCRES_COMMAND='python C:\path\to\DocRes\inference.py --task {task} --input "{input}" --output "{output}"'
+git clone --recurse-submodules <repository-url>
+# Hoặc với repository đã clone:
+git submodule update --init --recursive
+```
+
+Weights không nằm trong lịch sử Git. Đặt các tệp model tại:
+
+- `external/DocRes/checkpoints/docres.pkl`
+- `external/DocRes/data/MBD/checkpoint/mbd.pkl`
+
+Khi mã nguồn và weights đã sẵn sàng, app tự dùng wrapper
+`scripts/run_docres.py`. Ngoài ra có thể cấu hình command adapter riêng:
+
+```powershell
+$env:DOCRES_COMMAND='python C:\path\to\adapter.py --task {task} --input "{input}" --output "{output}"'
 streamlit run app.py
 ```
 
-Các placeholder:
+Các placeholder của command adapter:
 
 - `{input}`: ảnh tạm đầu vào do app ghi ra.
 - `{output}`: ảnh tạm mà lệnh DocRes phải tạo.
 - `{task}`: `end2end` hoặc `deblurring`.
 
-Nếu chọn DocRes nhưng chưa cấu hình hoặc lệnh lỗi, app tự fallback về OpenCV baseline để workflow không bị gãy.
+DocRes là lựa chọn mặc định. Nếu chưa cấu hình, timeout hoặc lệnh lỗi, app tự
+fallback về OpenCV. Trong `Cấu hình nâng cao`, người dùng có thể chọn `Chỉ
+OpenCV` để bỏ qua DocRes.
+
+## Phân Tích Tệp DOCX Tham Chiếu
+
+Script `create_report.py` chỉ phân tích cấu trúc/định dạng của một tệp DOCX và
+ghi kết quả ra tệp văn bản; script không tự cài dependency và không tự tạo báo
+cáo khoa học hoàn chỉnh.
+
+```powershell
+python -m pip install python-docx
+python create_report.py .\reference.docx --output .\BaoCao_DeBlur_analysis.txt
+```
 
 ## Kiểm Thử
 
@@ -86,7 +113,8 @@ Các test hiện khóa những contract chính:
 - PaddleOCR result parser và fallback sang EasyOCR.
 - Policy tiền xử lý OCR theo engine.
 - DocRes adapter fallback.
-- Enhancement, detection, face, metrics và blur generator.
+- Chính sách mặc định DocRes và override OpenCV.
+- Enhancement, detection, face, metrics và blur generator ở tầng utility.
 
 ## Cấu Trúc
 
@@ -109,10 +137,10 @@ deblur-unblur/
 
 ## Ghi Chú Kỹ Thuật
 
-- Không nên tối ưu theo sharpness/Laplacian đơn thuần. Chỉ số này vẫn hiển thị để tham khảo, nhưng mục tiêu chính là OCR đúng hơn.
+- UI không hiển thị sharpness/PSNR/SSIM vì chúng không phản ánh trực tiếp độ đúng OCR.
 - Với OCR hiện đại như PaddleOCR, không threshold ảnh quá sớm nếu chưa có số liệu chứng minh tốt hơn.
 - OpenCV baseline vẫn hữu ích cho demo nhanh, CPU-only và fallback.
-- DocRes nên được đánh giá bằng tập ảnh CCCD/giấy tờ thật với ground truth để chọn giữa `end2end` và `deblurring`.
+- App cố định DocRes task `deblurring` để giữ luồng sử dụng đơn giản.
 
 ## License
 

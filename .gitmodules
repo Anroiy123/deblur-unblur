@@ -1,0 +1,4 @@
+[submodule "external/DocRes"]
+	path = external/DocRes
+	url = https://github.com/ZZZHANG-jx/DocRes.git
+	ignore = dirty

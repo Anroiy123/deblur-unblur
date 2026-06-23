@@ -31,6 +31,18 @@ def test_order_points_returns_consistent_order():
     assert np.array_equal(ordered[3], [20, 100])
 
 
+def test_order_points_keeps_four_unique_points_when_sums_tie():
+    pts = np.array([[0, 1], [1, 0], [2, 1], [1, 2]], dtype=np.float32)
+
+    ordered = detection.order_points(pts)
+
+    assert len(np.unique(ordered, axis=0)) == 4
+    assert np.array_equal(ordered[0], [0, 1])
+    assert np.array_equal(ordered[1], [1, 0])
+    assert np.array_equal(ordered[2], [2, 1])
+    assert np.array_equal(ordered[3], [1, 2])
+
+
 def test_apply_perspective_transform_returns_non_empty_crop(card_like_image):
     contour = np.array([[[60, 70]], [[360, 70]], [[360, 240]], [[60, 240]]], dtype=np.int32)
     warped = detection.apply_perspective_transform(card_like_image, contour)

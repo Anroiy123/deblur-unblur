@@ -56,6 +56,53 @@ def test_extract_text_supports_paddleocr_legacy_result_shape(text_like_image, mo
     assert result == "CONG HOA XA HOI\n123456789012"
 
 
+def test_get_paddleocr_reader_retries_after_value_error(monkeypatch):
+    attempts = []
+    env_during_import = []
+
+    class FakePaddleOCR:
+        def __init__(self, **kwargs):
+            attempts.append(kwargs)
+            if "show_log" in kwargs:
+                raise ValueError("Unknown argument: show_log")
+
+    monkeypatch.setattr(ocr, "_paddle_reader", None)
+    monkeypatch.delenv("FLAGS_enable_pir_api", raising=False)
+
+    class FakeModule:
+        PaddleOCR = FakePaddleOCR
+
+    def fake_import(name):
+        env_during_import.append((name, ocr.os.environ.get("FLAGS_enable_pir_api")))
+        return FakeModule()
+
+    monkeypatch.setattr(ocr.importlib, "import_module", fake_import)
+
+    reader = ocr.get_paddleocr_reader()
+
+    assert isinstance(reader, FakePaddleOCR)
+    assert env_during_import == [("paddleocr", "0")]
+    assert attempts == [
+        {
+            "use_angle_cls": True,
+            "lang": "vi",
+            "show_log": False,
+            "enable_mkldnn": False,
+        },
+        {
+            "use_angle_cls": True,
+            "lang": "vi",
+            "enable_mkldnn": False,
+        },
+    ]
+
+
+def test_collect_paddle_text_preserves_all_rec_texts():
+    raw_result = {"rec_texts": ["LINE 1", "LINE 2", "LINE 3"]}
+
+    assert ocr._collect_paddle_text(raw_result) == ["LINE 1", "LINE 2", "LINE 3"]
+
+
 def test_extract_text_with_details_falls_back_to_easyocr(text_like_image, monkeypatch):
     def raise_missing_paddle():
         raise RuntimeError("paddle missing")
@@ -87,6 +134,14 @@ def test_calculate_accuracy_normalizes_whitespace_and_case():
 
 def test_calculate_accuracy_partial_match():
     assert ocr.calculate_accuracy("abcd", "abzz") == 50.0
+
+
+def test_calculate_accuracy_uses_edit_distance_for_insertions():
+    assert round(ocr.calculate_accuracy("abcdef", "xabcdef"), 2) == 83.33
+
+
+def test_calculate_accuracy_is_clamped_at_zero():
+    assert ocr.calculate_accuracy("a", "abcdefgh") == 0.0
 
 
 def test_error_rate_metrics_use_edit_distance():

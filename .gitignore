@@ -10,6 +10,8 @@ DEMO_SCRIPT.md
 .coverage
 plans/
 .kiro
+blur
+BaoCao_DeBlur_analysis.txt
 
 # Python
 venv/

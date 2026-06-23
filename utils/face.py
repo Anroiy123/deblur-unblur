@@ -107,11 +107,20 @@ def blend_face_back(image, enhanced_face, face_bbox):
     # Create result image
     result = image.copy()
 
-    # Create a mask for smooth blending
-    mask = np.ones((h, w), dtype=np.float32)
+    # Keep the center opaque while feathering the edge into the source image.
+    mask = np.zeros((h, w), dtype=np.float32)
+    inset = max(1, min(h, w) // 10)
+    if h > 2 * inset and w > 2 * inset:
+        mask[inset:h - inset, inset:w - inset] = 1.0
+    else:
+        mask[:, :] = 1.0
 
-    # Apply Gaussian blur to mask for smooth transition
-    mask = cv2.GaussianBlur(mask, (21, 21), 11)
+    kernel_size = min(21, h if h % 2 == 1 else h - 1, w if w % 2 == 1 else w - 1)
+    kernel_size = max(3, kernel_size)
+    mask = cv2.GaussianBlur(mask, (kernel_size, kernel_size), 0)
+    max_mask = float(mask.max())
+    if max_mask > 0:
+        mask /= max_mask
     mask = np.stack([mask] * 3, axis=2)
 
     # Blend face region
