@@ -68,7 +68,7 @@ def test_image_to_bgr_normalizes_palette_images():
 def test_processing_signature_changes_with_content_or_settings():
     first = make_processing_signature(b"one", ("natural", "opencv"))
     second = make_processing_signature(b"two", ("natural", "opencv"))
-    third = make_processing_signature(b"one", ("ocr", "opencv"))
+    third = make_processing_signature(b"one", ("natural", "docres"))
 
     assert len({first, second, third}) == 3
 

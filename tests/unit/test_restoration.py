@@ -5,7 +5,7 @@ def test_restore_document_image_opencv_backend_preserves_contract(blurred_image)
     result = restoration.restore_document_image(
         blurred_image,
         backend="opencv",
-        mode="ocr",
+        mode="document",
         use_deconvolution=False,
     )
 
@@ -129,7 +129,7 @@ def test_auto_backend_promotes_restormer_when_docres_fails(blurred_image, monkey
     result = restoration.restore_document_image(
         blurred_image,
         backend="auto",
-        mode="ocr",
+        mode="document",
         restoration_task="deblurring",
     )
 

@@ -4,10 +4,10 @@ from pathlib import Path
 APP_SOURCE = Path("app.py").read_text(encoding="utf-8")
 
 
-def test_main_ui_contains_only_the_simplified_processing_flow():
+def test_main_ui_contains_only_the_restoration_flow():
     required_labels = (
+        "Khử mờ tài liệu",
         "Chọn ảnh cần cải thiện",
-        "Mục tiêu xử lý",
         "Cấu hình nâng cao",
         "Tự động tốt nhất (DocRes -> Restormer -> NAFNet -> OpenCV)",
         '"DocRes": DOCRES_RESTORATION',
@@ -15,9 +15,20 @@ def test_main_ui_contains_only_the_simplified_processing_flow():
         '"NAFNet": NAFNET_RESTORATION',
         '"Chỉ OpenCV": OPENCV_RESTORATION',
         "Cải thiện ảnh",
-        "Độ chính xác OCR với ground truth",
+        "Khôi phục thực tế",
     )
     removed_labels = (
+        "Văn bản OCR",
+        "OCR thực tế",
+        "OCR từ ảnh đầu vào",
+        "OCR từ ảnh sau xử lý",
+        "ground truth",
+        "CER",
+        "WER",
+        "Tiền xử lý OCR",
+        "Ưu tiên OCR",
+        "PADDLEOCR_BACKEND",
+        "EASYOCR_BACKEND",
         "Chọn trang",
         "Tạo ảnh mờ thử nghiệm",
         "Phát hiện vùng căn cước",
@@ -25,8 +36,6 @@ def test_main_ui_contains_only_the_simplified_processing_flow():
         "cải thiện vùng khuôn mặt",
         "Độ nét ảnh đầu vào",
         "Số ký tự cải thiện",
-        "PaddleOCR",
-        "fallback sang EasyOCR",
     )
 
     for label in required_labels:
@@ -43,7 +52,8 @@ def test_app_no_longer_imports_removed_feature_modules():
         "calculate_psnr",
         "calculate_ssim",
         "calculate_sharpness",
-        "PADDLEOCR_BACKEND",
+        "utils.ocr",
+        "utils.text_processing",
     )
 
     for removed_import in removed_imports:

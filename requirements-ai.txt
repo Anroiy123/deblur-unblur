@@ -1,5 +1,5 @@
 # Optional AI/runtime extras for the recommended pipeline.
-# Keep these separate from requirements.txt so the OpenCV/EasyOCR baseline stays easy to install.
+# Keep these separate from requirements.txt so the OpenCV baseline stays easy to install.
 #
 # Recommended install on this Windows/NVIDIA setup:
 #   py -3.12 -m venv .venv312

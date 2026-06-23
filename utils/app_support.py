@@ -10,7 +10,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 SUPPORTED_IMAGE_FORMATS = {"JPEG", "PNG"}
 PROCESSING_RESULT_KEY = "processing_result"
-PROCESSING_PIPELINE_VERSION = "ocr-pipeline-v2"
+PROCESSING_PIPELINE_VERSION = "restoration-pipeline-v1"
 
 
 class ImageValidationError(ValueError):

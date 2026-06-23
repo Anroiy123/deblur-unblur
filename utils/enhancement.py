@@ -123,14 +123,14 @@ def wiener_deconvolution(image, kernel_size=5, noise_variance=0.01):
     return _deconvolve_channel(image, kernel_size=kernel_size)
 
 
-def enhance_image(image, use_deconvolution=False, mode='ocr'):
+def enhance_image(image, use_deconvolution=False, mode='document'):
     """
     Complete enhancement pipeline combining multiple techniques.
 
     Args:
         image: Input image (BGR)
         use_deconvolution: Whether to apply Wiener deconvolution
-        mode: 'ocr' for stronger text-focused enhancement, 'natural' for color-preserving preview
+        mode: 'document' for stronger document enhancement, 'natural' for color-preserving preview
 
     Returns:
         Enhanced image

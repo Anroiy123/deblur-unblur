@@ -185,7 +185,7 @@ def get_nafnet_command_template():
     return ""
 
 
-def restore_with_opencv(image, mode="ocr", use_deconvolution=False):
+def restore_with_opencv(image, mode="document", use_deconvolution=False):
     restored = enhance_image(image, use_deconvolution=use_deconvolution, mode=mode)
     return RestorationResult(
         image=restored,
@@ -301,7 +301,7 @@ def get_restoration_fallback_chain(backend):
 def restore_document_image(
     image,
     backend=AUTO_RESTORATION,
-    mode="ocr",
+    mode="document",
     use_deconvolution=False,
     restoration_task=None,
     docres_task="end2end",

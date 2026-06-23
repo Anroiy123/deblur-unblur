@@ -1,35 +1,6 @@
-import sys
-import types
-
 import cv2
 import numpy as np
 import pytest
-
-
-class FakeEasyOCRReader:
-    def __init__(self, results=None, should_raise=False):
-        self.results = results or []
-        self.should_raise = should_raise
-        self.calls = []
-
-    def readtext(self, image):
-        self.calls.append(image)
-        if self.should_raise:
-            raise RuntimeError("mock OCR failure")
-        return self.results
-
-
-@pytest.fixture(autouse=True)
-def stub_easyocr_module(monkeypatch):
-    fake_module = types.SimpleNamespace(Reader=lambda *args, **kwargs: FakeEasyOCRReader())
-    monkeypatch.setitem(sys.modules, "easyocr", fake_module)
-
-    import utils.ocr as ocr
-
-    monkeypatch.setattr(ocr, "_reader", None)
-    monkeypatch.setattr(ocr, "easyocr", fake_module)
-    yield
-    monkeypatch.setattr(ocr, "_reader", None)
 
 
 @pytest.fixture
