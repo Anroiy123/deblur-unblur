@@ -1,4 +1,5 @@
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,26 @@ def expected_output_path(out_dir, input_path, task):
     return Path(out_dir) / f"{source.stem}_{task}{source.suffix}"
 
 
+def build_docres_environment(shim_dir):
+    """Provide compatibility aliases without modifying the DocRes submodule."""
+    shim_dir = Path(shim_dir)
+    shim_dir.mkdir(parents=True, exist_ok=True)
+    (shim_dir / "sitecustomize.py").write_text(
+        "import numpy as np\n"
+        "if 'bool' not in np.__dict__:\n"
+        "    np.bool = bool\n",
+        encoding="utf-8",
+    )
+
+    environment = os.environ.copy()
+    existing_pythonpath = environment.get("PYTHONPATH")
+    pythonpath_entries = [str(shim_dir)]
+    if existing_pythonpath:
+        pythonpath_entries.append(existing_pythonpath)
+    environment["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    return environment
+
+
 def main():
     args = parse_args()
     input_path = Path(args.input).resolve()
@@ -39,6 +60,7 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="docres_out_") as temp_dir:
+        environment = build_docres_environment(Path(temp_dir) / "compat")
         command = [
             sys.executable,
             "inference.py",
@@ -58,6 +80,7 @@ def main():
             text=True,
             timeout=args.timeout,
             check=False,
+            env=environment,
         )
         if completed.returncode != 0:
             message = (completed.stderr or completed.stdout or "").strip()
