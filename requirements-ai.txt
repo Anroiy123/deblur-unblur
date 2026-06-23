@@ -1,4 +1,4 @@
-# Optional AI backends for the recommended pipeline.
+# Optional AI/runtime extras for the recommended pipeline.
 # Keep these separate from requirements.txt so the OpenCV/EasyOCR baseline stays easy to install.
 #
 # Recommended install on this Windows/NVIDIA setup:
@@ -6,9 +6,6 @@
 #   .venv312\Scripts\python.exe -m pip install -r requirements.txt -r requirements-ai.txt
 
 --extra-index-url https://download.pytorch.org/whl/cu128
-
-paddleocr==3.5.0
-paddlepaddle==3.3.1
 
 # DocRes runtime dependencies. The upstream repo and weights live under external/DocRes.
 torch==2.11.0+cu128

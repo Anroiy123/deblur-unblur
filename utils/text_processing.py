@@ -144,10 +144,7 @@ def preprocess_for_ocr(image):
 
 def preserve_for_ocr(image):
     """
-    Keep the image close to detector input for modern OCR engines.
-
-    Modern OCR engines such as PaddleOCR usually perform their own detection
-    and normalization, so aggressive thresholding can remove faint strokes.
+    Keep the image close to detector input for OCR inspection/debugging.
     """
     return image.copy()
 
@@ -158,7 +155,7 @@ def prepare_image_for_ocr(image, backend="easyocr", profile=OCR_PREPROCESS_AUTO)
 
     Args:
         image: Input image (BGR or grayscale)
-        backend: OCR backend key, e.g. 'easyocr' or 'paddleocr'
+        backend: OCR backend key, e.g. 'easyocr'
         profile: 'auto', 'preserve', 'grayscale', or 'threshold'
 
     Returns:
@@ -176,6 +173,4 @@ def prepare_image_for_ocr(image, backend="easyocr", profile=OCR_PREPROCESS_AUTO)
     if profile != OCR_PREPROCESS_AUTO:
         raise ValueError(f"Unsupported OCR preprocessing profile: {profile}")
 
-    if backend in ("paddleocr", "paddle", "paddle_ocr"):
-        return preserve_for_ocr(image)
     return preprocess_for_ocr(image)

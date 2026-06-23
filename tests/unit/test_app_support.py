@@ -103,7 +103,19 @@ def test_processing_result_persists_only_for_matching_signature():
 
 
 def test_resolve_restoration_backend_prefers_docres_for_auto():
-    assert resolve_restoration_backend("auto") == "docres"
+    assert resolve_restoration_backend("auto") == "auto"
+
+
+def test_resolve_restoration_backend_allows_docres_override():
+    assert resolve_restoration_backend("docres") == "docres"
+
+
+def test_resolve_restoration_backend_allows_restormer_override():
+    assert resolve_restoration_backend("restormer") == "restormer"
+
+
+def test_resolve_restoration_backend_allows_nafnet_override():
+    assert resolve_restoration_backend("nafnet") == "nafnet"
 
 
 def test_resolve_restoration_backend_allows_opencv_override():

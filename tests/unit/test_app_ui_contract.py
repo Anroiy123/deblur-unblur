@@ -9,8 +9,11 @@ def test_main_ui_contains_only_the_simplified_processing_flow():
         "Chọn ảnh cần cải thiện",
         "Mục tiêu xử lý",
         "Cấu hình nâng cao",
-        "Tự động (DocRes, fallback OpenCV)",
-        "Chỉ OpenCV",
+        "Tự động tốt nhất (DocRes -> Restormer -> NAFNet -> OpenCV)",
+        '"DocRes": DOCRES_RESTORATION',
+        '"Restormer": RESTORMER_RESTORATION',
+        '"NAFNet": NAFNET_RESTORATION',
+        '"Chỉ OpenCV": OPENCV_RESTORATION',
         "Cải thiện ảnh",
         "Độ chính xác OCR với ground truth",
     )
@@ -22,6 +25,8 @@ def test_main_ui_contains_only_the_simplified_processing_flow():
         "cải thiện vùng khuôn mặt",
         "Độ nét ảnh đầu vào",
         "Số ký tự cải thiện",
+        "PaddleOCR",
+        "fallback sang EasyOCR",
     )
 
     for label in required_labels:
@@ -38,6 +43,7 @@ def test_app_no_longer_imports_removed_feature_modules():
         "calculate_psnr",
         "calculate_ssim",
         "calculate_sharpness",
+        "PADDLEOCR_BACKEND",
     )
 
     for removed_import in removed_imports:

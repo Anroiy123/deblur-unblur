@@ -83,7 +83,13 @@ def calculate_percentage_change(original_value, new_value):
 def resolve_restoration_backend(choice):
     normalized = (choice or "").strip().lower()
     if normalized == "auto":
+        return "auto"
+    if normalized == "docres":
         return "docres"
+    if normalized == "restormer":
+        return "restormer"
+    if normalized == "nafnet":
+        return "nafnet"
     if normalized == "opencv":
         return "opencv"
     raise ValueError(f"Unsupported restoration choice: {choice}")

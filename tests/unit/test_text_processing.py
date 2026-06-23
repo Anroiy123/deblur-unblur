@@ -48,10 +48,10 @@ def test_preprocess_for_ocr_returns_binary_image(text_like_image):
     assert set(np.unique(result)).issubset({0, 255})
 
 
-def test_prepare_image_for_ocr_auto_keeps_paddle_input_unthresholded(text_like_image):
+def test_prepare_image_for_ocr_auto_ignores_removed_paddle_alias(text_like_image):
     result = text_processing.prepare_image_for_ocr(text_like_image, backend="paddleocr", profile="auto")
-    assert result.shape == text_like_image.shape
-    assert np.array_equal(result, text_like_image)
+    assert result.ndim == 2
+    assert set(np.unique(result)).issubset({0, 255})
 
 
 def test_prepare_image_for_ocr_auto_thresholds_easyocr_input(text_like_image):

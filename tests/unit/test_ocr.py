@@ -43,84 +43,15 @@ def test_extract_text_returns_error_string_on_failure(text_like_image, monkeypat
     assert result.startswith("Error during OCR:")
 
 
-def test_extract_text_supports_paddleocr_legacy_result_shape(text_like_image, monkeypatch):
-    class FakePaddleReader:
-        def ocr(self, _image, cls=True):
-            return [[
-                [None, ("CONG HOA XA HOI", 0.98)],
-                [None, ("123456789012", 0.97)],
-            ]]
-
-    monkeypatch.setattr(ocr, "get_paddleocr_reader", lambda: FakePaddleReader())
+def test_extract_text_rejects_removed_paddle_backend(text_like_image):
     result = ocr.extract_text(text_like_image, backend="paddleocr")
-    assert result == "CONG HOA XA HOI\n123456789012"
+    assert result == "Error during OCR: Unsupported OCR backend: paddleocr"
 
 
-def test_get_paddleocr_reader_retries_after_value_error(monkeypatch):
-    attempts = []
-    env_during_import = []
-
-    class FakePaddleOCR:
-        def __init__(self, **kwargs):
-            attempts.append(kwargs)
-            if "show_log" in kwargs:
-                raise ValueError("Unknown argument: show_log")
-
-    monkeypatch.setattr(ocr, "_paddle_reader", None)
-    monkeypatch.delenv("FLAGS_enable_pir_api", raising=False)
-
-    class FakeModule:
-        PaddleOCR = FakePaddleOCR
-
-    def fake_import(name):
-        env_during_import.append((name, ocr.os.environ.get("FLAGS_enable_pir_api")))
-        return FakeModule()
-
-    monkeypatch.setattr(ocr.importlib, "import_module", fake_import)
-
-    reader = ocr.get_paddleocr_reader()
-
-    assert isinstance(reader, FakePaddleOCR)
-    assert env_during_import == [("paddleocr", "0")]
-    assert attempts == [
-        {
-            "use_angle_cls": True,
-            "lang": "vi",
-            "show_log": False,
-            "enable_mkldnn": False,
-        },
-        {
-            "use_angle_cls": True,
-            "lang": "vi",
-            "enable_mkldnn": False,
-        },
-    ]
-
-
-def test_collect_paddle_text_preserves_all_rec_texts():
-    raw_result = {"rec_texts": ["LINE 1", "LINE 2", "LINE 3"]}
-
-    assert ocr._collect_paddle_text(raw_result) == ["LINE 1", "LINE 2", "LINE 3"]
-
-
-def test_extract_text_with_details_falls_back_to_easyocr(text_like_image, monkeypatch):
-    def raise_missing_paddle():
-        raise RuntimeError("paddle missing")
-
-    fake_reader = FakeEasyOCRReader(results=[(None, "fallback text", 0.9)])
-    monkeypatch.setattr(ocr, "get_paddleocr_reader", raise_missing_paddle)
-    monkeypatch.setattr(ocr, "get_reader", lambda: fake_reader)
-
-    result = ocr.extract_text_with_details(
-        text_like_image,
-        backend="paddleocr",
-        fallback_backend="easyocr",
-    )
-
-    assert result.ok
-    assert result.used_fallback is True
-    assert result.backend == "easyocr"
-    assert result.text == "fallback text"
+def test_extract_text_with_details_rejects_removed_paddle_backend(text_like_image):
+    result = ocr.extract_text_with_details(text_like_image, backend="paddleocr")
+    assert result.ok is False
+    assert result.error == "Unsupported OCR backend: paddleocr"
 
 
 def test_calculate_accuracy_handles_empty_text():

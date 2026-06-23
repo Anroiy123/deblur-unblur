@@ -1,147 +1,317 @@
 # ID Card Deblur + OCR Application
 
-Ứng dụng Streamlit một trang để khử mờ ảnh căn cước/giấy tờ và trích xuất
-văn bản OCR. Luồng mặc định ưu tiên DocRes rồi tự fallback OpenCV; OCR ưu tiên
-PaddleOCR rồi fallback EasyOCR.
-
-## Kiến trúc Pipeline
+Ứng dụng Streamlit để khử mờ ảnh giấy tờ và OCR văn bản. Pipeline khôi phục
+ảnh hiện tại hỗ trợ:
 
 ```text
-uploaded image
-  -> restoration backend
-       - DocRes deblurring (default)
-       - OpenCV fallback or manual override
-  -> OCR preprocessing policy
-       - auto by engine
-       - preserve color/original
-       - OpenCV threshold
-  -> OCR backend
-       - PaddleOCR (preferred)
-       - EasyOCR fallback
-  -> optional CER/WER against text ground truth
+DocRes -> Restormer -> NAFNet -> OpenCV
 ```
 
-## Tính Năng
+OCR mặc định dùng `EasyOCR`.
 
-- **Document restoration**: mặc định thử DocRes `deblurring`, tự fallback OpenCV nếu lỗi.
-- **Enhancement modes**: chế độ tự nhiên để dễ xem và chế độ OCR để tăng nét chữ.
-- **OCR tự động**: ưu tiên PaddleOCR và fallback EasyOCR, không yêu cầu người dùng chọn engine.
-- **Backend-aware OCR preprocessing**: PaddleOCR mặc định giữ ảnh màu/gốc để tránh threshold phá nét chữ; EasyOCR baseline vẫn có thể dùng threshold OpenCV.
-- **Cấu hình nâng cao**: cho phép ép OpenCV, đổi preprocessing và bật Wiener deconvolution.
-- **OCR metrics**: CER và WER khi người dùng có ground truth văn bản.
+## Yêu cầu
 
-## Cài Đặt
+- Windows + PowerShell
+- Python 3.12
+- Repo được clone đầy đủ tại `deblur-unblur`
 
-Yêu cầu Python 3.9+. Cấu hình đã được kiểm thử chính trên Python 3.12.
+## Chạy app
+
+### Cách nhanh nhất trên máy đã có sẵn môi trường
+
+Nếu repo này đã có `.venv312`:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\.venv312\Scripts\python.exe -m streamlit run app.py
 ```
 
-Nếu muốn dùng PaddleOCR:
+Mở trình duyệt tại:
+
+```text
+http://127.0.0.1:8501
+```
+
+Nếu `8501` đang bị chiếm cổng:
 
 ```powershell
-pip install -r requirements-ai.txt
+.\.venv312\Scripts\python.exe -m streamlit run app.py --server.port 8502
 ```
 
-`requirements-ai.txt` được tách riêng vì PaddleOCR/PaddlePaddle nặng hơn và có thể cần chọn bản phù hợp CPU/GPU của máy.
+Khi đó mở:
 
-## Chạy Ứng Dụng
+```text
+http://127.0.0.1:8502
+```
+
+### Chạy từ đầu từng bước
+
+1. Tạo môi trường ảo Python 3.12:
 
 ```powershell
-streamlit run app.py
+py -3.12 -m venv .venv312
 ```
 
-Mở trình duyệt tại `http://localhost:8501`.
-
-## Cấu Hình DocRes Adapter
-
-DocRes được khai báo dưới dạng Git submodule. Khi clone mới, lấy mã nguồn
-submodule bằng một trong hai cách:
+2. Kích hoạt môi trường:
 
 ```powershell
-git clone --recurse-submodules <repository-url>
-# Hoặc với repository đã clone:
-git submodule update --init --recursive
+.\.venv312\Scripts\Activate.ps1
 ```
 
-Weights không nằm trong lịch sử Git. Đặt các tệp model tại:
+3. Cài dependency nền:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+4. Cài dependency AI:
+
+```powershell
+python -m pip install -r requirements-ai.txt
+python -m pip install gdown natsort yacs addict lmdb lpips joblib h5py tb-nightly yapf
+```
+
+5. Chạy app:
+
+```powershell
+python -m streamlit run app.py
+```
+
+6. Mở app trong trình duyệt:
+
+```text
+http://127.0.0.1:8501
+```
+
+## Các bước sử dụng trong app
+
+1. Tải ảnh `.jpg`, `.jpeg` hoặc `.png`.
+2. Chọn mục tiêu xử lý:
+   - `Tự nhiên`: ưu tiên ảnh nhìn tự nhiên hơn.
+   - `Ưu tiên OCR`: ưu tiên tương phản và khả năng đọc chữ.
+3. Mở `Cấu hình nâng cao` nếu cần:
+   - `Khôi phục tài liệu`
+   - `Tiền xử lý OCR`
+   - `Wiener deconvolution`
+4. Nhấn `Cải thiện ảnh`.
+5. Xem:
+   - ảnh trước/sau xử lý
+   - OCR từ ảnh gốc
+   - OCR từ ảnh sau xử lý
+   - backend thực tế đã dùng
+
+## Backend khôi phục ảnh
+
+Trong UI `Cấu hình nâng cao -> Khôi phục tài liệu` có các lựa chọn:
+
+- `Tự động tốt nhất (DocRes -> Restormer -> NAFNet -> OpenCV)`
+- `DocRes`
+- `Restormer`
+- `NAFNet`
+- `Chỉ OpenCV`
+
+Ý nghĩa:
+
+- `Tự động tốt nhất`: thử `DocRes`, nếu lỗi sẽ fallback sang `Restormer`, tiếp đó
+  `NAFNet`, cuối cùng là `OpenCV`.
+- `DocRes`, `Restormer`, `NAFNet`: ép chạy backend tương ứng; nếu backend đó lỗi,
+  app vẫn có thể fallback về backend khác hoặc `OpenCV`.
+- `Chỉ OpenCV`: không gọi model ngoài.
+
+## Repo/model ngoài đang dùng
+
+### DocRes
+
+Repo:
+
+```text
+external/DocRes
+```
+
+Weights:
 
 - `external/DocRes/checkpoints/docres.pkl`
 - `external/DocRes/data/MBD/checkpoint/mbd.pkl`
 
-Khi mã nguồn và weights đã sẵn sàng, app tự dùng wrapper
-`scripts/run_docres.py`. Ngoài ra có thể cấu hình command adapter riêng:
+Adapter:
+
+```text
+scripts/run_docres.py
+```
+
+### Restormer
+
+Repo:
+
+```text
+external/Restormer
+```
+
+Weight:
+
+```text
+external/Restormer/Motion_Deblurring/pretrained_models/motion_deblurring.pth
+```
+
+Adapter:
+
+```text
+scripts/run_restormer.py
+```
+
+### NAFNet
+
+Repo:
+
+```text
+external/NAFNet
+```
+
+Weight:
+
+```text
+external/NAFNet/experiments/pretrained_models/NAFNet-GoPro-width64.pth
+```
+
+Config test:
+
+```text
+external/NAFNet/options/test/GoPro/NAFNet-width64.yml
+```
+
+Adapter:
+
+```text
+scripts/run_nafnet.py
+```
+
+## Biến môi trường tùy chọn
+
+Nếu muốn override Python dùng cho backend AI:
+
+```powershell
+$env:RESTORATION_PYTHON='C:\path\to\python.exe'
+```
+
+Hoặc theo từng backend:
+
+```powershell
+$env:DOCRES_PYTHON='C:\path\to\python.exe'
+$env:RESTORMER_PYTHON='C:\path\to\python.exe'
+$env:NAFNET_PYTHON='C:\path\to\python.exe'
+```
+
+Nếu muốn override command adapter:
 
 ```powershell
 $env:DOCRES_COMMAND='python C:\path\to\adapter.py --task {task} --input "{input}" --output "{output}"'
-streamlit run app.py
+$env:RESTORMER_COMMAND='python C:\path\to\adapter.py --task {task} --input "{input}" --output "{output}"'
+$env:NAFNET_COMMAND='python C:\path\to\adapter.py --task {task} --input "{input}" --output "{output}"'
 ```
 
-Các placeholder của command adapter:
+## Smoke test backend riêng lẻ
 
-- `{input}`: ảnh tạm đầu vào do app ghi ra.
-- `{output}`: ảnh tạm mà lệnh DocRes phải tạo.
-- `{task}`: `end2end` hoặc `deblurring`.
-
-DocRes là lựa chọn mặc định. Nếu chưa cấu hình, timeout hoặc lệnh lỗi, app tự
-fallback về OpenCV. Trong `Cấu hình nâng cao`, người dùng có thể chọn `Chỉ
-OpenCV` để bỏ qua DocRes.
-
-## Phân Tích Tệp DOCX Tham Chiếu
-
-Script `create_report.py` chỉ phân tích cấu trúc/định dạng của một tệp DOCX và
-ghi kết quả ra tệp văn bản; script không tự cài dependency và không tự tạo báo
-cáo khoa học hoàn chỉnh.
+### DocRes
 
 ```powershell
-python -m pip install python-docx
-python create_report.py .\reference.docx --output .\BaoCao_DeBlur_analysis.txt
+.\.venv312\Scripts\python.exe scripts\run_docres.py --task deblurring --input external\DocRes\input\for_debluring.png --output tmp\docres-smoke.png
 ```
 
-## Kiểm Thử
+### Restormer
+
+```powershell
+.\.venv312\Scripts\python.exe scripts\run_restormer.py --task deblurring --input external\DocRes\input\for_debluring.png --output tmp\restormer-smoke.png
+```
+
+### NAFNet
+
+```powershell
+.\.venv312\Scripts\python.exe scripts\run_nafnet.py --task deblurring --input external\DocRes\input\for_debluring.png --output tmp\nafnet-smoke.png
+```
+
+## Kiểm thử
+
+Chạy toàn bộ test:
 
 ```powershell
 python -m pytest
 ```
 
-Các test hiện khóa những contract chính:
+Chạy test parser/backend UI:
 
-- OCR EasyOCR cache và text extraction.
-- PaddleOCR result parser và fallback sang EasyOCR.
-- Policy tiền xử lý OCR theo engine.
-- DocRes adapter fallback.
-- Chính sách mặc định DocRes và override OpenCV.
-- Enhancement, detection, face, metrics và blur generator ở tầng utility.
+```powershell
+python -m pytest tests/unit/test_app_support.py
+python -m pytest tests/unit/test_restoration.py
+```
 
-## Cấu Trúc
+## Lỗi thường gặp
+
+### 1. Chọn `NAFNet` hoặc `Restormer` rồi báo lỗi chung trong UI
+
+Nguyên nhân hay gặp nhất là app Streamlit đang chạy bằng instance cũ hoặc code cũ
+chưa restart.
+
+Cách xử lý:
+
+1. Dừng app đang chạy bằng `Ctrl + C`.
+2. Chạy lại:
+
+```powershell
+.\.venv312\Scripts\python.exe -m streamlit run app.py
+```
+
+3. Nếu vẫn nghi ngờ cổng cũ đang bị giữ:
+
+```powershell
+.\.venv312\Scripts\python.exe -m streamlit run app.py --server.port 8502
+```
+
+4. Mở đúng URL mới, ví dụ `http://127.0.0.1:8502`.
+
+Ghi chú: trạng thái repo hiện tại đã được kiểm tra lại với UI và cả `Restormer`
+lẫn `NAFNet` đều chạy được trên instance mới.
+
+### 2. Thiếu model/weight
+
+Nếu backend AI không chạy, kiểm tra các đường dẫn:
+
+- `external/DocRes/checkpoints/docres.pkl`
+- `external/DocRes/data/MBD/checkpoint/mbd.pkl`
+- `external/Restormer/Motion_Deblurring/pretrained_models/motion_deblurring.pth`
+- `external/NAFNet/experiments/pretrained_models/NAFNet-GoPro-width64.pth`
+
+### 3. Muốn chỉ chạy bản an toàn, ít phụ thuộc
+
+Chọn `Chỉ OpenCV` trong `Khôi phục tài liệu`.
+
+## Cấu trúc chính
 
 ```text
 deblur-unblur/
 ├── app.py
 ├── requirements.txt
 ├── requirements-ai.txt
+├── scripts/
+│   ├── run_docres.py
+│   ├── run_restormer.py
+│   └── run_nafnet.py
+├── external/
+│   ├── DocRes/
+│   ├── Restormer/
+│   └── NAFNet/
 ├── utils/
-│   ├── enhancement.py
-│   ├── restoration.py
-│   ├── text_processing.py
-│   ├── ocr.py
-│   ├── detection.py
-│   ├── face.py
-│   ├── metrics.py
-│   └── blur_generator.py
 └── tests/
 ```
 
-## Ghi Chú Kỹ Thuật
+## Trạng thái đã xác nhận
 
-- UI không hiển thị sharpness/PSNR/SSIM vì chúng không phản ánh trực tiếp độ đúng OCR.
-- Với OCR hiện đại như PaddleOCR, không threshold ảnh quá sớm nếu chưa có số liệu chứng minh tốt hơn.
-- OpenCV baseline vẫn hữu ích cho demo nhanh, CPU-only và fallback.
-- App cố định DocRes task `deblurring` để giữ luồng sử dụng đơn giản.
+- App mở được bằng Streamlit local
+- Upload ảnh mẫu thành công
+- `DocRes`, `Restormer`, `NAFNet`, `OpenCV` đều đã được nối vào UI
+- `Restormer` và `NAFNet` đã được smoke test riêng
+- `Restormer` và `NAFNet` đã được bấm chạy thành công từ giao diện web trên
+  instance mới
 
 ## License
 
-Project phục vụ mục đích học tập/thực nghiệm Computer Vision.
+Project phục vụ mục đích học tập và thực nghiệm Computer Vision.

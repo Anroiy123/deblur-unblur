@@ -9,33 +9,50 @@ from utils.app_support import (
     image_to_bgr,
     load_uploaded_image,
     make_processing_signature,
-    resolve_restoration_backend,
     store_processing_result,
 )
 from utils.ocr import (
     EASYOCR_BACKEND,
-    PADDLEOCR_BACKEND,
     calculate_character_error_rate,
     calculate_word_error_rate,
     extract_text_with_details,
     get_backend_label,
 )
-from utils.restoration import (
-    DOCRES_RESTORATION,
-    restore_document_image,
-)
+from utils.restoration import restore_document_image
 from utils.text_processing import prepare_image_for_ocr
 
 
 logger = logging.getLogger(__name__)
 
-AUTO_RESTORATION_LABEL = "Tự động (DocRes, fallback OpenCV)"
-OPENCV_ONLY_LABEL = "Chỉ OpenCV"
+AUTO_RESTORATION_LABEL = "Tự động tốt nhất (DocRes -> Restormer -> NAFNet -> OpenCV)"
+AUTO_RESTORATION = "auto"
+DOCRES_RESTORATION = "docres"
+RESTORMER_RESTORATION = "restormer"
+NAFNET_RESTORATION = "nafnet"
+OPENCV_RESTORATION = "opencv"
+RESTORATION_BACKEND_LABELS = {
+    AUTO_RESTORATION: "Tự động tốt nhất",
+    DOCRES_RESTORATION: "DocRes",
+    RESTORMER_RESTORATION: "Restormer",
+    NAFNET_RESTORATION: "NAFNet",
+    OPENCV_RESTORATION: "OpenCV",
+}
+RESTORATION_OPTIONS = {
+    AUTO_RESTORATION_LABEL: AUTO_RESTORATION,
+    "DocRes": DOCRES_RESTORATION,
+    "Restormer": RESTORMER_RESTORATION,
+    "NAFNet": NAFNET_RESTORATION,
+    "Chỉ OpenCV": OPENCV_RESTORATION,
+}
 PREPROCESS_OPTIONS = {
     "Tự động theo engine": "auto",
     "Giữ ảnh màu/gốc": "preserve",
     "OpenCV threshold": "threshold",
 }
+
+
+def get_restoration_backend_label(backend):
+    return RESTORATION_BACKEND_LABELS.get(str(backend).strip().lower(), str(backend))
 
 
 def resize_for_processing(image_bgr, max_width=1024):
@@ -118,8 +135,11 @@ enhancement_mode = "natural" if mode_label == "Tự nhiên" else "ocr"
 with st.expander("Cấu hình nâng cao", expanded=False):
     restoration_label = st.selectbox(
         "Khôi phục tài liệu",
-        [AUTO_RESTORATION_LABEL, OPENCV_ONLY_LABEL],
-        help="Mặc định thử DocRes trước và tự dùng OpenCV nếu DocRes lỗi.",
+        list(RESTORATION_OPTIONS),
+        help=(
+            "Mặc định thử DocRes, rồi Restormer, rồi NAFNet trước khi quay về OpenCV. "
+            "Bạn cũng có thể ép chạy từng backend nếu đã cấu hình adapter tương ứng."
+        ),
     )
     preprocess_label = st.selectbox(
         "Tiền xử lý OCR",
@@ -131,8 +151,8 @@ with st.expander("Cấu hình nâng cao", expanded=False):
         help="Chỉ nên bật cho motion/defocus blur nhẹ và ảnh ít nhiễu.",
     )
 
-restoration_choice = "auto" if restoration_label == AUTO_RESTORATION_LABEL else "opencv"
-restoration_backend = resolve_restoration_backend(restoration_choice)
+restoration_choice = RESTORATION_OPTIONS[restoration_label]
+restoration_backend = restoration_choice
 ocr_preprocess_profile = PREPROCESS_OPTIONS[preprocess_label]
 
 processing_signature = make_processing_signature(
@@ -162,23 +182,21 @@ if st.button("Cải thiện ảnh", type="primary", width="stretch"):
             processing_stage = "trích xuất OCR"
             original_preprocessed = prepare_image_for_ocr(
                 source_bgr,
-                backend=PADDLEOCR_BACKEND,
+                backend=EASYOCR_BACKEND,
                 profile=ocr_preprocess_profile,
             )
             enhanced_preprocessed = prepare_image_for_ocr(
                 enhanced_bgr,
-                backend=PADDLEOCR_BACKEND,
+                backend=EASYOCR_BACKEND,
                 profile=ocr_preprocess_profile,
             )
             original_ocr_result = extract_text_with_details(
                 original_preprocessed,
-                backend=PADDLEOCR_BACKEND,
-                fallback_backend=EASYOCR_BACKEND,
+                backend=EASYOCR_BACKEND,
             )
             enhanced_ocr_result = extract_text_with_details(
                 enhanced_preprocessed,
-                backend=PADDLEOCR_BACKEND,
-                fallback_backend=EASYOCR_BACKEND,
+                backend=EASYOCR_BACKEND,
             )
 
         store_processing_result(
@@ -208,11 +226,21 @@ original_ocr_result = processing_result["original_ocr_result"]
 enhanced_ocr_result = processing_result["enhanced_ocr_result"]
 
 if restoration_result.used_fallback:
-    st.warning("DocRes không chạy được; ứng dụng đã tự dùng OpenCV thay thế.")
+    requested_backend_label = get_restoration_backend_label(
+        restoration_result.requested_backend or restoration_backend
+    )
+    actual_backend_label = get_restoration_backend_label(restoration_result.backend)
+    st.warning(
+        f"{requested_backend_label} không chạy được trọn vẹn; ứng dụng đã tự dùng "
+        f"{actual_backend_label} thay thế."
+    )
 elif restoration_result.backend == DOCRES_RESTORATION:
     st.success("Ảnh được khôi phục bằng DocRes.")
 else:
-    st.info("Ảnh được xử lý bằng OpenCV theo cấu hình đã chọn.")
+    st.info(
+        f"Ảnh được xử lý bằng {get_restoration_backend_label(restoration_result.backend)} "
+        "theo cấu hình đã chọn."
+    )
 
 st.subheader("Kết quả")
 before_col, after_col = st.columns(2)
@@ -231,11 +259,9 @@ with after_col:
 
 actual_ocr_backend = get_backend_label(enhanced_ocr_result.backend)
 st.caption(
-    f"Khôi phục thực tế: {restoration_result.backend}; "
+    f"Khôi phục thực tế: {get_restoration_backend_label(restoration_result.backend)}; "
     f"OCR thực tế: {actual_ocr_backend}; tiền xử lý: {preprocess_label}."
 )
-if original_ocr_result.used_fallback or enhanced_ocr_result.used_fallback:
-    st.warning("PaddleOCR không chạy được; ứng dụng đã fallback sang EasyOCR.")
 
 st.subheader("Văn bản OCR")
 original_col, enhanced_col = st.columns(2)

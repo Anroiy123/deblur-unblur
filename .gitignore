@@ -11,6 +11,7 @@ DEMO_SCRIPT.md
 plans/
 .kiro
 blur
+tmp/
 BaoCao_DeBlur_analysis.txt
 
 # Python
